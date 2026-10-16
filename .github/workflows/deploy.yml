@@ -1,13 +1,12 @@
 name: deploy
 
 on:
-  push:
-    tags:
-    - '*'
+  workflow_dispatch: {}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -17,17 +16,22 @@ jobs:
       - name: Build
         run: |
           pip install --upgrade pip build
-          python -m build -s -w
+          echo "hatchling==1.29.0" > "$RUNNER_TEMP/build-constraints.txt"
+          PIP_CONSTRAINT="$RUNNER_TEMP/build-constraints.txt" PIP_BUILD_CONSTRAINT="$RUNNER_TEMP/build-constraints.txt" python -m build -s -w
+          ls -l dist/
       - name: Store the distribution packages
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
+          if-no-files-found: error
 
   pypi-publish:
+    if: false
     needs:
       - build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: pypi
     permissions:
       # IMPORTANT: this permission is mandatory for Trusted Publishing
