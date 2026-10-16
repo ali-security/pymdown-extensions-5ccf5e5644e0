@@ -1,5 +1,8 @@
 """Test caret."""
 from .. import util
+from pymdownx import caret
+import re
+import time
 
 
 class TestCaretSmart(util.MdCase):
@@ -325,3 +328,27 @@ class TestCaretNoSmart(util.MdCase):
             ''',
             True
         )
+
+
+class TestCaretCatastrophicBacktracking(util.MdCase):
+    """Test that unclosed caret runs are rejected without catastrophic backtracking."""
+
+    extension = [
+        'pymdownx.caret'
+    ]
+    extension_configs = {}
+
+    def test_sup2(self):
+        """Test that `^a` followed by a long run of carets is rejected quickly."""
+
+        start = time.perf_counter()
+        self.assertIsNone(re.compile(caret.SUP2, re.DOTALL | re.UNICODE).match('^a' + '^' * 42 + 'b'))
+        self.assertLess(time.perf_counter() - start, 1.0)
+
+    def test_unclosed_caret_run(self):
+        """Test that a long unclosed caret run renders quickly with the default configuration."""
+
+        start = time.perf_counter()
+        html = self.md.convert('^a' + '^' * 42 + 'b')
+        self.assertLess(time.perf_counter() - start, 1.0)
+        self.assertTrue(html.startswith('<p>') and html.endswith('</p>'))

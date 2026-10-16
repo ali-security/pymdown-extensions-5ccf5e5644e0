@@ -1,5 +1,8 @@
 """Test cases for BetterEm."""
 from .. import util
+from pymdownx import betterem
+import re
+import time
 
 
 class TestBetterNoSmart(util.MdCase):
@@ -278,3 +281,55 @@ class TestBetterSmartAll(util.MdCase):
             ''',
             True
         )
+
+
+class TestBetterEmCatastrophicBacktracking(util.MdCase):
+    """Test that unclosed delimiter runs are rejected without catastrophic backtracking."""
+
+    extension = [
+        'pymdownx.betterem'
+    ]
+    extension_configs = {}
+
+    def assert_fast_no_match(self, pattern, text):
+        """Assert that the pattern rejects the text well within a second."""
+
+        start = time.perf_counter()
+        self.assertIsNone(re.compile(pattern, re.DOTALL | re.UNICODE).match(text))
+        self.assertLess(time.perf_counter() - start, 1.0)
+
+    def test_star_em2(self):
+        """Test that `*a` followed by a long run of asterisks is rejected quickly."""
+
+        self.assert_fast_no_match(betterem.STAR_EM2, '*a' + '*' * 42 + 'b')
+
+    def test_under_em2(self):
+        """Test that `_a` followed by a long run of underscores is rejected quickly."""
+
+        self.assert_fast_no_match(betterem.UNDER_EM2, '_a' + '_' * 42 + 'b')
+
+    def test_smart_star_em2(self):
+        """Test that `*a` followed by a long run of asterisks is rejected quickly in smart mode."""
+
+        self.assert_fast_no_match(betterem.SMART_STAR_EM2, '*a' + '*' * 42 + 'b')
+
+    def test_smart_under_em2(self):
+        """Test that `_a` followed by a long run of underscores is rejected quickly in smart mode."""
+
+        self.assert_fast_no_match(betterem.SMART_UNDER_EM2, '_a' + '_' * 42 + 'b')
+
+    def test_unclosed_underscore_run(self):
+        """Test that a long unclosed underscore run renders quickly with the default configuration."""
+
+        text = '_a' + '_' * 42 + 'b'
+        start = time.perf_counter()
+        self.check_markdown(text, '<p>{}</p>'.format(text))
+        self.assertLess(time.perf_counter() - start, 1.0)
+
+    def test_unclosed_asterisk_runs(self):
+        """Test that repeated unclosed asterisk runs render quickly with the default configuration."""
+
+        start = time.perf_counter()
+        html = self.md.convert('*a' + '*****b' * 16)
+        self.assertLess(time.perf_counter() - start, 1.0)
+        self.assertTrue(html.startswith('<p>') and html.endswith('</p>'))

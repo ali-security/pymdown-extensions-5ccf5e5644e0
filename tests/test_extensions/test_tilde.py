@@ -1,5 +1,8 @@
 """Test tilde."""
 from .. import util
+from pymdownx import tilde
+import re
+import time
 
 
 class TestTildeSmart(util.MdCase):
@@ -334,3 +337,27 @@ class TestTildeNoSmart(util.MdCase):
             ''',
             True
         )
+
+
+class TestTildeCatastrophicBacktracking(util.MdCase):
+    """Test that unclosed tilde runs are rejected without catastrophic backtracking."""
+
+    extension = [
+        'pymdownx.tilde'
+    ]
+    extension_configs = {}
+
+    def test_sub2(self):
+        """Test that `~a` followed by a long run of tildes is rejected quickly."""
+
+        start = time.perf_counter()
+        self.assertIsNone(re.compile(tilde.SUB2, re.DOTALL | re.UNICODE).match('~a' + '~' * 42 + 'b'))
+        self.assertLess(time.perf_counter() - start, 1.0)
+
+    def test_unclosed_tilde_run(self):
+        """Test that a long unclosed tilde run renders quickly with the default configuration."""
+
+        start = time.perf_counter()
+        html = self.md.convert('~a' + '~' * 42 + 'b')
+        self.assertLess(time.perf_counter() - start, 1.0)
+        self.assertTrue(html.startswith('<p>') and html.endswith('</p>'))

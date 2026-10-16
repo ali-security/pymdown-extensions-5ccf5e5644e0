@@ -1,6 +1,9 @@
 """Test cases for MagicLink."""
 from .. import util
+from pymdownx import magiclink
 import markdown
+import re
+import time
 import warnings
 
 
@@ -399,3 +402,45 @@ class TestMagicLinkWarning(util.MdCase):
             self.assertTrue(len(w) == 1)
             self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
             self.assertTrue(found)
+
+
+class TestMagicLinkCatastrophicBacktracking(util.MdCase):
+    """Test that host names with long runs of dots are rejected without catastrophic backtracking."""
+
+    extension = [
+        'pymdownx.magiclink'
+    ]
+    extension_configs = {}
+
+    def assert_fast_no_link(self, text):
+        """Assert that the link pattern rejects the text well within a second."""
+
+        start = time.perf_counter()
+        self.assertIsNone(re.compile(magiclink.RE_LINK, re.DOTALL | re.UNICODE).search(text))
+        self.assertLess(time.perf_counter() - start, 1.0)
+
+    def test_link_host_dots(self):
+        """Test that an `http://` host followed by a long run of dots is rejected quickly."""
+
+        self.assert_fast_no_link('http://a' + '.' * 42 + ' ')
+
+    def test_www_host_dots(self):
+        """Test that a `www.` host followed by a long run of dots is rejected quickly."""
+
+        self.assert_fast_no_link('www.a' + '.' * 42 + ' ')
+
+    def test_unlinked_link_host_dots(self):
+        """Test that an `http://` host followed by a long run of dots renders quickly."""
+
+        text = 'http://a' + '.' * 42
+        start = time.perf_counter()
+        self.check_markdown(text, '<p>{}</p>'.format(text))
+        self.assertLess(time.perf_counter() - start, 1.0)
+
+    def test_unlinked_www_host_dots(self):
+        """Test that a `www.` host followed by a long run of dots renders quickly."""
+
+        text = 'www.a' + '.' * 42
+        start = time.perf_counter()
+        self.check_markdown(text, '<p>{}</p>'.format(text))
+        self.assertLess(time.perf_counter() - start, 1.0)
